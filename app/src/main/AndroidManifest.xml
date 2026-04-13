@@ -3,6 +3,17 @@
     xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-feature android:name="android.hardware.sensor.stepcounter" android:required="false" />
+    <!-- Internet-lupa osmdroid-karttatiilien lataukseen -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- GPS-tarkkuussijainti -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Verkkosijainti (varapaikannus) -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Askelmittari (Android 10+) -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+
+    <!-- Kamera (lisätään viikolla 4) -->
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <application
         android:name=".LuontopeliApplication"
