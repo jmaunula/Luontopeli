@@ -2,6 +2,7 @@ package com.example.luontopeli.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.net.Uri
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.core.content.ContextCompat
@@ -10,6 +11,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.luontopeli.data.local.AppDatabase
 import com.example.luontopeli.data.local.entity.NatureSpot
 import com.example.luontopeli.data.repository.NatureSpotRepository
+import com.example.luontopeli.ml.ClassificationResult
+import com.example.luontopeli.ml.PlantClassifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,12 +25,16 @@ import java.util.Locale
 class CameraViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getDatabase(application)
     private val repository = NatureSpotRepository(db.natureSpotDao())
+    private val classifier = PlantClassifier()
 
     private val _capturedImagePath = MutableStateFlow<String?>(null)
     val capturedImagePath: StateFlow<String?> = _capturedImagePath.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _classificationResult = MutableStateFlow<ClassificationResult?>(null)
+    val classificationResult: StateFlow<ClassificationResult?> = _classificationResult.asStateFlow()
 
     var currentLatitude: Double = 0.0
     var currentLongitude: Double = 0.0
@@ -46,7 +53,18 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                     _capturedImagePath.value = outputFile.absolutePath
-                    _isLoading.value = false
+
+                    viewModelScope.launch {
+                        try {
+                            val uri = Uri.fromFile(outputFile)
+                            val result = classifier.classify(uri, context)
+                            _classificationResult.value = result
+                        } catch (e: Exception) {
+                            _classificationResult.value =
+                                ClassificationResult.Error(e.message ?: "Tuntematon virhe")
+                        }
+                        _isLoading.value = false
+                    }
                 }
 
                 override fun onError(exception: ImageCaptureException) {
@@ -58,19 +76,31 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
 
     fun clearCapturedImage() {
         _capturedImagePath.value = null
+        _classificationResult.value = null
     }
 
     fun saveCurrentSpot() {
         val imagePath = _capturedImagePath.value ?: return
         viewModelScope.launch {
+            val result = _classificationResult.value
             val spot = NatureSpot(
-                name = "Luontoloyto",
+                name = when (result) {
+                    is ClassificationResult.Success -> result.label
+                    else -> "Luontolöytö"
+                },
                 latitude = currentLatitude,
                 longitude = currentLongitude,
-                imageLocalPath = imagePath
+                imageLocalPath = imagePath,
+                plantLabel = (result as? ClassificationResult.Success)?.label,
+                confidence = (result as? ClassificationResult.Success)?.confidence
             )
             repository.insertSpot(spot)
             clearCapturedImage()
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        classifier.close()
     }
 }

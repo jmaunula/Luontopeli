@@ -17,18 +17,24 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -41,6 +47,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -50,6 +57,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.example.luontopeli.ml.ClassificationResult
 import com.example.luontopeli.viewmodel.CameraViewModel
 import java.io.File
 
@@ -83,6 +91,7 @@ fun CameraScreen(viewModel: CameraViewModel = viewModel()) {
 
     val capturedImagePath by viewModel.capturedImagePath.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val classificationResult by viewModel.classificationResult.collectAsState()
 
     if (!hasCameraPermission) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -95,7 +104,7 @@ fun CameraScreen(viewModel: CameraViewModel = viewModel()) {
                 )
                 Text("Kameran lupa tarvitaan", modifier = Modifier.padding(8.dp))
                 Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
-                    Text("Myonna lupa")
+                    Text("Myönnä lupa")
                 }
             }
         }
@@ -158,6 +167,8 @@ fun CameraScreen(viewModel: CameraViewModel = viewModel()) {
         } else {
             CapturedImageView(
                 imagePath = capturedImagePath ?: "",
+                isLoading = isLoading,
+                classificationResult = classificationResult,
                 onRetake = { viewModel.clearCapturedImage() },
                 onSave = { viewModel.saveCurrentSpot() }
             )
@@ -168,6 +179,8 @@ fun CameraScreen(viewModel: CameraViewModel = viewModel()) {
 @Composable
 fun CapturedImageView(
     imagePath: String,
+    isLoading: Boolean,
+    classificationResult: ClassificationResult?,
     onRetake: () -> Unit,
     onSave: () -> Unit
 ) {
@@ -182,6 +195,34 @@ fun CapturedImageView(
                 .background(Color.Black)
         )
 
+        when {
+            isLoading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                        Text(
+                            text = "Tunnistetaan kasvia...",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+            classificationResult != null -> {
+                ClassificationResultCard(
+                    result = classificationResult,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -193,10 +234,101 @@ fun CapturedImageView(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Ota uudelleen")
             }
-            Button(onClick = onSave) {
+            Button(
+                onClick = onSave,
+                enabled = !isLoading
+            ) {
                 Icon(imageVector = Icons.Default.Save, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Tallenna loyto")
+                Text("Tallenna löytö")
+            }
+        }
+    }
+}
+
+@Composable
+fun ClassificationResultCard(
+    result: ClassificationResult,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = when (result) {
+                is ClassificationResult.Success ->
+                    if (result.confidence > 0.8f)
+                        MaterialTheme.colorScheme.primaryContainer
+                    else
+                        MaterialTheme.colorScheme.secondaryContainer
+                else -> MaterialTheme.colorScheme.errorContainer
+            }
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            when (result) {
+                is ClassificationResult.Success -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Tunnistettu:",
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        Badge(
+                            containerColor = when {
+                                result.confidence > 0.8f -> Color(0xFF2E7D32)
+                                result.confidence > 0.6f -> Color(0xFFF57C00)
+                                else -> Color(0xFFD32F2F)
+                            }
+                        ) {
+                            Text(
+                                text = "${"%.0f".format(result.confidence * 100)}%",
+                                color = Color.White
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = result.label,
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+
+                    LinearProgressIndicator(
+                        progress = { result.confidence },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(CircleShape),
+                        color = when {
+                            result.confidence > 0.8f -> Color(0xFF2E7D32)
+                            result.confidence > 0.6f -> Color(0xFFF57C00)
+                            else -> Color(0xFFD32F2F)
+                        }
+                    )
+                }
+
+                is ClassificationResult.NotNature -> {
+                    Text(
+                        text = "Ei luontokohde",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    if (result.allLabels.isNotEmpty()) {
+                        Text(
+                            text = "Kuvassa tunnistettiin: ${result.allLabels.joinToString { it.text }}",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
+
+                is ClassificationResult.Error -> {
+                    Text(
+                        text = "Tunnistus epäonnistui: ${result.message}",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
             }
         }
     }
