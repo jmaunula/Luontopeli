@@ -10,6 +10,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.luontopeli.data.local.AppDatabase
 import com.example.luontopeli.data.local.entity.NatureSpot
+import com.example.luontopeli.data.remote.firebase.AuthManager
+import com.example.luontopeli.data.remote.firebase.FirestoreManager
+import com.example.luontopeli.data.remote.firebase.StorageManager
 import com.example.luontopeli.data.repository.NatureSpotRepository
 import com.example.luontopeli.ml.ClassificationResult
 import com.example.luontopeli.ml.PlantClassifier
@@ -24,7 +27,12 @@ import java.util.Locale
 
 class CameraViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getDatabase(application)
-    private val repository = NatureSpotRepository(db.natureSpotDao())
+    private val repository = NatureSpotRepository(
+        dao = db.natureSpotDao(),
+        firestoreManager = FirestoreManager(),
+        storageManager = StorageManager(),
+        authManager = AuthManager()
+    )
     private val classifier = PlantClassifier()
 
     private val _capturedImagePath = MutableStateFlow<String?>(null)
