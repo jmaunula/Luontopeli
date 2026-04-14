@@ -1,10 +1,11 @@
-# Luontopeli
 
 APK: https://github.com/jmaunula/Luontopeli/releases/tag/luontopeli
 
-## Toteutetut ominaisuudet
+# Toteutetut ominaisuudet
 
-Kaikki vaaditut asiat arvosanaan 3 on toteutettu
+Kaikki perussuoritukseen vaaditut asiat on tehty + yksi lisäominaisuus  
+
+## Perussuoritus
 
 - **Viikko 1 – M3 + navigaatio**
   - Toimiva navigaatio
@@ -34,3 +35,11 @@ Kaikki vaaditut asiat arvosanaan 3 on toteutettu
 - **Viikko 7 – Viimeistely**
   - Splash screen
   - Adaptive icon
+  - Release AAB kääntyy
+
+## Lisäominaisuudet
+
+- **Firebase-integraatio**
+  - Oikea Firebase Auth + Firestore + Storage (ei stubeja).
+  - Havainnot synkronoituvat pilveen.
+  
